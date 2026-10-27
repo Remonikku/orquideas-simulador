@@ -1,0 +1,72 @@
+{
+  "version": "1.0.0",
+  "invernadero": {
+    "id": "inv-orq-7c4e2a",
+    "nombre": "Invernadero de Orquídeas — Nave 1",
+    "ubicacion": "Prototipo académico · Integración de Competencias II"
+  },
+  "broker": {
+    "url": "wss://broker.hivemq.com:8884/mqtt",
+    "descripcion": "Broker MQTT público de HiveMQ (WebSocket seguro)",
+    "alternativas": [
+      "wss://broker.emqx.io:8084/mqtt",
+      "wss://test.mosquitto.org:8081/mqtt"
+    ]
+  },
+  "topicBase": "intcomp2/orquideas/inv-orq-7c4e2a",
+  "condicionesOptimas": {
+    "humedadObjetivo": 80,
+    "humedadMin": 70,
+    "humedadMax": 90,
+    "temperaturaNoche": 18,
+    "temperaturaDia": 24,
+    "horaInicioDia": 7,
+    "horaInicioNoche": 19
+  },
+  "sensores": [
+    {
+      "id": "ESP32-WIFI-A1",
+      "nombre": "Nodo Wi-Fi Bancada A",
+      "modelo": "ESP32 + SHT31",
+      "protocolo": "WIFI",
+      "zona": "Bancada A · Phalaenopsis",
+      "gateway": "AP-INVERNADERO",
+      "offsetTemperatura": 0.3,
+      "offsetHumedad": -1.2,
+      "pin": "482913"
+    },
+    {
+      "id": "ESP32-WIFI-B1",
+      "nombre": "Nodo Wi-Fi Bancada B",
+      "modelo": "ESP32 + DHT22",
+      "protocolo": "WIFI",
+      "zona": "Bancada B · Cattleya",
+      "gateway": "AP-INVERNADERO",
+      "offsetTemperatura": 0.8,
+      "offsetHumedad": -3.0,
+      "pin": "735146"
+    },
+    {
+      "id": "BLE-HT-C1",
+      "nombre": "Sensor BLE Bancada C",
+      "modelo": "nRF52840 + BME280",
+      "protocolo": "BLE",
+      "zona": "Bancada C · Dendrobium",
+      "gateway": "GW-BLE-01",
+      "offsetTemperatura": -0.4,
+      "offsetHumedad": 1.5,
+      "pin": "209584"
+    },
+    {
+      "id": "BLE-HT-D1",
+      "nombre": "Sensor BLE Propagación",
+      "modelo": "nRF52832 + HDC1080",
+      "protocolo": "BLE",
+      "zona": "Zona de propagación",
+      "gateway": "GW-BLE-01",
+      "offsetTemperatura": -0.9,
+      "offsetHumedad": 3.2,
+      "pin": "618370"
+    }
+  ]
+}

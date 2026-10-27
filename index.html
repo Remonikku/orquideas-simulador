@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OrquídeaSense · Simulador de Sensores IoT del Invernadero</title>
+  <meta name="description" content="Simulador web de sensores de temperatura y humedad (Wi-Fi y Bluetooth LE) para un invernadero de orquídeas. Publica lecturas en tiempo real vía MQTT para el panel de monitoreo.">
+  <meta name="theme-color" content="#0b1016">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌸</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div class="fondo-aurora" aria-hidden="true"></div>
+
+  <header class="barra-superior">
+    <div class="marca">
+      <div class="marca-logo" aria-hidden="true">
+        <svg viewBox="0 0 48 48"><g fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M24 26c-6-9-15-9-17-4s6 9 17 4z"/><path d="M24 26c6-9 15-9 17-4s-6 9-17 4z"/><path d="M24 26c-4-10-2-19 0-21 2 2 4 11 0 21z"/><path d="M24 26c-3 6-2 12 0 14 2-2 3-8 0-14z"/><circle cx="24" cy="26" r="2.2" fill="currentColor"/></g></svg>
+      </div>
+      <div>
+        <h1>OrquídeaSense <span>Simulador IoT</span></h1>
+        <p id="nombre-invernadero" class="subtitulo">Cargando configuración…</p>
+      </div>
+    </div>
+
+    <div class="estado-global">
+      <div class="pildora" id="pildora-mqtt" data-estado="conectando" title="Estado del broker MQTT">
+        <span class="punto"></span><span class="texto">Conectando broker…</span>
+      </div>
+      <div class="pildora" id="pildora-panel" data-estado="desconectado" title="Panel de monitoreo (Node.js)">
+        <span class="punto"></span><span class="texto">Panel sin conectar</span>
+      </div>
+      <div class="reloj" id="reloj" aria-live="polite">
+        <span id="icono-ciclo" aria-hidden="true">☀️</span>
+        <span id="hora-actual">--:--:--</span>
+      </div>
+      <button class="btn btn-primario" id="btn-simulacion" type="button" aria-pressed="true">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3v14H7zM14 5h3v14h-3z" fill="currentColor"/></svg>
+        <span>Pausar</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="contenedor">
+    <!-- Vista del invernadero -->
+    <section class="tarjeta vista-invernadero" aria-labelledby="titulo-vista">
+      <div class="tarjeta-cabecera">
+        <div>
+          <h2 id="titulo-vista">Vista del invernadero</h2>
+          <p class="ayuda">Nodos ESP32 (Wi-Fi) y nRF52 (Bluetooth LE) transmitiendo al broker MQTT.</p>
+        </div>
+        <div class="ambiente-resumen">
+          <div class="dato-grande">
+            <span class="etiqueta">Temp. ambiente</span>
+            <strong id="amb-temperatura">--.-</strong><small>°C</small>
+          </div>
+          <div class="dato-grande">
+            <span class="etiqueta">Humedad relativa</span>
+            <strong id="amb-humedad">--.-</strong><small>%</small>
+          </div>
+          <div class="dato-grande">
+            <span class="etiqueta">Mensajes enviados</span>
+            <strong id="contador-mensajes">0</strong>
+          </div>
+        </div>
+      </div>
+      <div class="lienzo-invernadero">
+        <svg id="svg-invernadero" viewBox="0 0 900 470" role="img" aria-label="Diagrama del invernadero con sensores"></svg>
+      </div>
+      <div class="leyenda">
+        <span><i class="ley ley-wifi"></i> Wi-Fi 802.11 b/g/n</span>
+        <span><i class="ley ley-ble"></i> Bluetooth Low Energy → Gateway BLE</span>
+        <span><i class="ley ley-mqtt"></i> MQTT sobre WebSocket (TLS)</span>
+        <span><i class="ley ley-riego"></i> Nebulización / riego activo</span>
+      </div>
+    </section>
+
+    <!-- Panel de control del entorno -->
+    <aside class="tarjeta panel-control" aria-labelledby="titulo-control">
+      <h2 id="titulo-control">Control del entorno</h2>
+
+      <label class="campo" for="sel-escenario">
+        <span>Escenario climático</span>
+        <select id="sel-escenario"></select>
+      </label>
+      <p class="ayuda" id="desc-escenario"></p>
+
+      <label class="campo" for="rng-temperatura">
+        <span>Ajuste de temperatura <output id="out-temperatura">0.0 °C</output></span>
+        <input type="range" id="rng-temperatura" min="-8" max="8" step="0.5" value="0">
+      </label>
+
+      <label class="campo" for="rng-humedad">
+        <span>Ajuste de humedad <output id="out-humedad">0 %</output></span>
+        <input type="range" id="rng-humedad" min="-30" max="15" step="1" value="0">
+      </label>
+
+      <label class="campo" for="rng-ruido">
+        <span>Ruido de medición <output id="out-ruido">0.3</output></span>
+        <input type="range" id="rng-ruido" min="0" max="1.5" step="0.1" value="0.3">
+      </label>
+
+      <label class="campo" for="sel-intervalo">
+        <span>Intervalo de transmisión</span>
+        <select id="sel-intervalo">
+          <option value="2">Cada 2 segundos</option>
+          <option value="5" selected>Cada 5 segundos</option>
+          <option value="10">Cada 10 segundos</option>
+          <option value="30">Cada 30 segundos</option>
+          <option value="60">Cada 60 segundos</option>
+        </select>
+      </label>
+
+      <button class="btn btn-fantasma ancho" id="btn-restablecer" type="button">Restablecer ajustes</button>
+
+      <div class="separador"></div>
+
+      <h3>Actuador de riego / nebulización</h3>
+      <div class="actuador" id="actuador-riego" data-activo="false">
+        <div class="actuador-icono" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 2.7c-3.3 4-6 7.3-6 10.8a6 6 0 0 0 12 0c0-3.5-2.7-6.8-6-10.8z" fill="currentColor"/></svg>
+        </div>
+        <div>
+          <strong id="actuador-estado">Electroválvula cerrada</strong>
+          <p class="ayuda" id="actuador-detalle">Esperando comandos del panel o activación manual.</p>
+        </div>
+      </div>
+      <div class="fila-botones">
+        <button class="btn btn-agua" id="btn-riego" type="button">Regar 2 min</button>
+        <button class="btn btn-fantasma" id="btn-detener-riego" type="button" disabled>Detener</button>
+      </div>
+
+      <div class="separador"></div>
+
+      <h3>Conexión del panel</h3>
+      <dl class="datos-conexion">
+        <dt>Broker</dt><dd id="info-broker">—</dd>
+        <dt>Tópico base</dt><dd id="info-topico">—</dd>
+        <dt>ID cliente</dt><dd id="info-cliente">—</dd>
+      </dl>
+    </aside>
+
+    <!-- Sensores -->
+    <section class="seccion-sensores" aria-labelledby="titulo-sensores">
+      <div class="seccion-cabecera">
+        <h2 id="titulo-sensores">Nodos sensores</h2>
+        <p class="ayuda">Usa <strong>Modo emparejamiento</strong> para vincular un sensor desde el panel ("Conectar Sensores") con el PIN mostrado.</p>
+      </div>
+      <div class="rejilla-sensores" id="rejilla-sensores"></div>
+    </section>
+
+    <!-- Consola MQTT -->
+    <section class="tarjeta consola" aria-labelledby="titulo-consola">
+      <div class="tarjeta-cabecera">
+        <h2 id="titulo-consola">Consola MQTT</h2>
+        <div class="fila-botones">
+          <label class="interruptor-mini" for="chk-auto-scroll">
+            <input type="checkbox" id="chk-auto-scroll" checked> Auto-desplazar
+          </label>
+          <button class="btn btn-fantasma btn-chico" id="btn-limpiar-consola" type="button">Limpiar</button>
+        </div>
+      </div>
+      <ol class="registro-consola" id="registro-consola" aria-live="off"></ol>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <p>Prototipo académico · Integración de Competencias II · Simulación de sensores para la Industria 4.0</p>
+  </footer>
+
+  <div class="contenedor-toasts" id="toasts" aria-live="polite"></div>
+
+  <template id="plantilla-sensor">
+    <article class="tarjeta-sensor" data-encendido="true">
+      <header>
+        <div class="sensor-titulo">
+          <span class="badge-protocolo"></span>
+          <h3 class="sensor-nombre"></h3>
+          <p class="sensor-modelo"></p>
+        </div>
+        <label class="interruptor" title="Encender / apagar nodo">
+          <input type="checkbox" class="chk-encendido" checked>
+          <span class="pista"></span>
+        </label>
+      </header>
+      <p class="sensor-zona"></p>
+      <div class="sensor-valores">
+        <div><span class="etiqueta">Temperatura</span><strong class="val-temp">--.-</strong><small>°C</small></div>
+        <div><span class="etiqueta">Humedad</span><strong class="val-hum">--.-</strong><small>%</small></div>
+      </div>
+      <canvas class="sparkline" width="320" height="64" aria-hidden="true"></canvas>
+      <div class="sensor-meta">
+        <span class="meta-rssi" title="Intensidad de señal"><i class="barras"><b></b><b></b><b></b><b></b></i><em>-- dBm</em></span>
+        <span class="meta-bateria" title="Batería"></span>
+        <span class="meta-vinculo"></span>
+      </div>
+      <div class="sensor-acciones">
+        <label class="campo-mini">
+          <span>Falla</span>
+          <select class="sel-falla"></select>
+        </label>
+        <button class="btn btn-fantasma btn-chico btn-emparejar" type="button">Modo emparejamiento</button>
+      </div>
+      <div class="panel-pin" hidden>
+        <span>PIN de emparejamiento</span>
+        <strong class="pin"></strong>
+        <small class="pin-cuenta"></small>
+      </div>
+    </article>
+  </template>
+
+  <script src="js/vendor/mqtt.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
